@@ -58,13 +58,7 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-void autonomous() {
-	pros::Motor left_wheels (1);
-	pros::Motor right_wheels (2);
-
-	right_wheels.move_relative(1000, 100);
-	left_wheels.move_relative(1000, 100);
-}
+void autonomous() {}
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -80,85 +74,21 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-	//create new motors
-	pros::Motor left_wheels (1);
-	pros::Motor right_wheels (10);
+	pros::Controller master(pros::E_CONTROLLER_MASTER);
+	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
+	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
 
-	//cant set ratio in declarator?
-	pros::Motor arm (8);
-	pros::Motor claw (3);
-
-	arm.set_gearing(pros::E_MOTOR_GEARSET_36);
-	claw.set_gearing(pros::E_MOTOR_GEARSET_36);
-
-	pros::ADIDigitalIn left_bumper ('a');
-	pros::ADIDigitalIn right_bumper ('b');
-	pros::ADIDigitalIn arm_limit ('h');
-
-	//create new controller
-	pros::Controller master (CONTROLLER_MASTER);
-
-	
-	// while (true) {
-	// 	left_wheels.move(master.get_analog(ANALOG_LEFT_Y)); //make sense
-	// 	right_wheels.move(master.get_analog(ANALOG_RIGHT_Y));
-
-	// 	pros::delay(2); //is in ms
-	// }
 
 	while (true) {
-		//get controller inputs
-		int power = master.get_analog(ANALOG_LEFT_Y);
-		int steer = master.get_analog(ANALOG_RIGHT_X);
+		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
+		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
+		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
 
-		//calc left and right
-		int left = power - steer;
-		int right = power + steer;
-
-		//normalize inputs if too big
-		if (left > 1 && left > right) {
-			left /= left;
-			right /= left;
-		} else if (right > 1 && right > left) {
-			right /= right;
-			left /= left;
-		}
-
-		//check bumpers
-		if (left_bumper.get_value() || right_bumper.get_value()) {
-			// One of the bump switches is currently pressed
-			if (left < 0) {
-			  left = 0;
-			}
-			if (right < 0) {
-			  right = 0;
-			}
-		  }
-
-		//run motors
-		left_wheels.move(left);
-		right_wheels.move(right);
-
-		// open loop arm controle
-		if (master.get_digital(DIGITAL_R1)) {
-			arm.move_velocity(100); //100 rpm motor
-		} else if (master.get_digital(DIGITAL_R2) && !arm_limit.get_value()) {
-			arm.move_velocity(100); //100 rpm motor
-		} else {
-			arm.move_velocity(0);
-		}
-
-		if (master.get_digital(DIGITAL_L1)) {
-			claw.move_velocity(100);
-		  }
-		  else if (master.get_digital(DIGITAL_L2)) {
-			claw.move_velocity(-100);
-		  }
-		  else {
-			claw.move_velocity(0);
-		  }
-
-		//timing display
-		pros::delay(2);
+		// Arcade control scheme
+		int dir = master.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
+		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
+		left_mg.move(dir - turn);                      // Sets left motor voltage
+		right_mg.move(dir + turn);                     // Sets right motor voltage
+		pros::delay(20);                               // Run for 20 ms then update
 	}
 }
